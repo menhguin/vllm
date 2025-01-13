@@ -900,7 +900,7 @@ class ModelConfig:
             "temperature",
             "top_k",
             "top_p",
-            "min_p",
+            "min_z",
         ]
         if any(p in config for p in available_params):
             diff_sampling_param = {

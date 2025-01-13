@@ -233,7 +233,7 @@ class ChatCompletionRequest(OpenAIBaseModel):
     best_of: Optional[int] = None
     use_beam_search: bool = False
     top_k: Optional[int] = None
-    min_p: Optional[float] = None
+    min_z: Optional[float] = None
     repetition_penalty: Optional[float] = None
     length_penalty: float = 1.0
     stop_token_ids: Optional[List[int]] = Field(default_factory=list)
@@ -362,7 +362,7 @@ class ChatCompletionRequest(OpenAIBaseModel):
         "temperature": 1.0,
         "top_p": 1.0,
         "top_k": -1,
-        "min_p": 0.0,
+        "min_z": 0.0,
     }
 
     def to_beam_search_params(
@@ -418,9 +418,9 @@ class ChatCompletionRequest(OpenAIBaseModel):
         if (top_k := self.top_k) is None:
             top_k = default_sampling_params.get(
                 "top_k", self._DEFAULT_SAMPLING_PARAMS["top_k"])
-        if (min_p := self.min_p) is None:
-            min_p = default_sampling_params.get(
-                "min_p", self._DEFAULT_SAMPLING_PARAMS["min_p"])
+        if (min_z := self.min_z) is None:
+            min_z = default_sampling_params.get(
+                "min_z", self._DEFAULT_SAMPLING_PARAMS["min_z"])
 
         prompt_logprobs = self.prompt_logprobs
         if prompt_logprobs is None and self.echo:
@@ -455,7 +455,7 @@ class ChatCompletionRequest(OpenAIBaseModel):
             temperature=temperature,
             top_p=top_p,
             top_k=top_k,
-            min_p=min_p,
+            min_z=min_z,
             seed=self.seed,
             stop=self.stop,
             stop_token_ids=self.stop_token_ids,
@@ -639,7 +639,7 @@ class CompletionRequest(OpenAIBaseModel):
     # doc: begin-completion-sampling-params
     use_beam_search: bool = False
     top_k: Optional[int] = None
-    min_p: Optional[float] = None
+    min_z: Optional[float] = None
     repetition_penalty: Optional[float] = None
     length_penalty: float = 1.0
     stop_token_ids: Optional[List[int]] = Field(default_factory=list)
@@ -723,7 +723,7 @@ class CompletionRequest(OpenAIBaseModel):
         "temperature": 1.0,
         "top_p": 1.0,
         "top_k": -1,
-        "min_p": 0.0,
+        "min_z": 0.0,
     }
 
     def to_beam_search_params(
@@ -776,9 +776,9 @@ class CompletionRequest(OpenAIBaseModel):
         if (top_k := self.top_k) is None:
             top_k = default_sampling_params.get(
                 "top_k", self._DEFAULT_SAMPLING_PARAMS["top_k"])
-        if (min_p := self.min_p) is None:
-            min_p = default_sampling_params.get(
-                "min_p", self._DEFAULT_SAMPLING_PARAMS["min_p"])
+        if (min_z := self.min_z) is None:
+            min_z = default_sampling_params.get(
+                "min_z", self._DEFAULT_SAMPLING_PARAMS["min_z"])
 
         prompt_logprobs = self.prompt_logprobs
         if prompt_logprobs is None and self.echo:
@@ -809,7 +809,7 @@ class CompletionRequest(OpenAIBaseModel):
             temperature=temperature,
             top_p=top_p,
             top_k=top_k,
-            min_p=min_p,
+            min_z=min_z,
             seed=self.seed,
             stop=self.stop,
             stop_token_ids=self.stop_token_ids,

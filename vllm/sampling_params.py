@@ -120,7 +120,7 @@ class SamplingParams(
             to consider. Must be in (0, 1]. Set to 1 to consider all tokens.
         top_k: Integer that controls the number of top tokens to consider. Set
             to -1 to consider all tokens.
-        min_p: Float that represents the minimum probability for a token to be
+        min_z: Float that represents the minimum probability for a token to be
             considered, relative to the probability of the most likely token.
             Must be in [0, 1]. Set to 0 to disable this.
         seed: Random seed to use for the generation.
@@ -176,7 +176,7 @@ class SamplingParams(
     temperature: float = 1.0
     top_p: float = 1.0
     top_k: int = -1
-    min_p: float = 0.0
+    min_z: float = 0.0
     seed: Optional[int] = None
     stop: Optional[Union[str, List[str]]] = None
     stop_token_ids: Optional[List[int]] = None
@@ -219,7 +219,7 @@ class SamplingParams(
         temperature: Optional[float] = 1.0,
         top_p: Optional[float] = 1.0,
         top_k: int = -1,
-        min_p: float = 0.0,
+        min_z: float = 0.0,
         seed: Optional[int] = None,
         stop: Optional[Union[str, List[str]]] = None,
         stop_token_ids: Optional[List[int]] = None,
@@ -259,7 +259,7 @@ class SamplingParams(
             temperature=1.0 if temperature is None else temperature,
             top_p=1.0 if top_p is None else top_p,
             top_k=top_k,
-            min_p=min_p,
+            min_z=min_z,
             seed=seed,
             stop=stop,
             stop_token_ids=stop_token_ids,
@@ -341,7 +341,7 @@ class SamplingParams(
             # Zero temperature means greedy sampling.
             self.top_p = 1.0
             self.top_k = -1
-            self.min_p = 0.0
+            self.min_z = 0.0
             self._verify_greedy_sampling()
         # eos_token_id is added to this by the engine
         self._all_stop_token_ids = set(self.stop_token_ids)
@@ -372,9 +372,9 @@ class SamplingParams(
         if not isinstance(self.top_k, int):
             raise TypeError(
                 f"top_k must be an integer, got {type(self.top_k).__name__}")
-        if not 0.0 <= self.min_p <= 1.0:
-            raise ValueError("min_p must be in [0, 1], got "
-                             f"{self.min_p}.")
+        if not 0.0 <= self.min_z <= 1.0:
+            raise ValueError("min_z must be in [0, 1], got "
+                             f"{self.min_z}.")
         if self.max_tokens is not None and self.max_tokens < 1:
             raise ValueError(
                 f"max_tokens must be at least 1, got {self.max_tokens}.")
@@ -473,7 +473,7 @@ class SamplingParams(
             f"temperature={self.temperature}, "
             f"top_p={self.top_p}, "
             f"top_k={self.top_k}, "
-            f"min_p={self.min_p}, "
+            f"min_z={self.min_z}, "
             f"seed={self.seed}, "
             f"stop={self.stop}, "
             f"stop_token_ids={self.stop_token_ids}, "
