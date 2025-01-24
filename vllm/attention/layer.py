@@ -148,10 +148,19 @@ class Attention(nn.Module):
         kv_cache: torch.Tensor,
         attn_metadata: AttentionMetadata,
     ) -> torch.Tensor:
+<<<<<<< HEAD
         if self.calculate_kv_scales and \
             attn_metadata.enable_kv_scales_calculation:
             self.calc_kv_scales(key, value)
         if self.use_output:
+=======
+
+        if self.use_direct_call:
+            return self.impl.forward(query, key, value, kv_cache,
+                                     attn_metadata, self._k_scale,
+                                     self._v_scale)
+        elif self.use_output:
+>>>>>>> parent of 0f8cafe2 ([Kernel] unified_attention for Attention.forward (#11967))
             output = torch.empty_like(query)
             hidden_size = query.size(-1)
             # Reshape the query, key, and value tensors.
@@ -163,19 +172,12 @@ class Attention(nn.Module):
                 key = key.view(-1, self.num_kv_heads, self.head_size)
             if value is not None:
                 value = value.view(-1, self.num_kv_heads, self.head_size)
-            if self.use_direct_call:
-                unified_attention_with_output(query, key, value, output,
-                                              self.layer_name)
-            else:
-                torch.ops.vllm.unified_attention_with_output(
-                    query, key, value, output, self.layer_name)
+            torch.ops.vllm.unified_attention_with_output(
+                query, key, value, output, self.layer_name)
             return output.view(-1, hidden_size)
         else:
-            if self.use_direct_call:
-                return unified_attention(query, key, value, self.layer_name)
-            else:
-                return torch.ops.vllm.unified_attention(
-                    query, key, value, self.layer_name)
+            return torch.ops.vllm.unified_attention(query, key, value,
+                                                    self.layer_name)
 
     def calc_kv_scales(self, key, value):
         self._k_scale.copy_(torch.abs(key).max() / self.k_range)

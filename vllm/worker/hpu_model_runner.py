@@ -29,7 +29,6 @@ from vllm_hpu_extension.profiler import (HabanaHighLevelProfiler,
 from vllm.attention import AttentionMetadata, get_attn_backend
 from vllm.config import DeviceConfig, VllmConfig
 from vllm.distributed.parallel_state import get_world_group
-from vllm.forward_context import set_forward_context
 from vllm.logger import init_logger
 from vllm.lora.layers import LoRAMapping
 from vllm.lora.request import LoRARequest
@@ -42,8 +41,7 @@ from vllm.multimodal import (MULTIMODAL_REGISTRY, BatchedTensorInputs,
 from vllm.sampling_params import SamplingParams
 from vllm.sequence import (IntermediateTensors, SequenceData,
                            SequenceGroupMetadata)
-from vllm.utils import (bind_kv_cache, is_pin_memory_available,
-                        make_tensor_with_pad)
+from vllm.utils import is_pin_memory_available, make_tensor_with_pad
 from vllm.worker.model_runner_base import (
     ModelRunnerBase, ModelRunnerInputBase,
     _add_attn_metadata_broadcastable_dict,
@@ -1300,9 +1298,6 @@ class HPUModelRunnerBase(ModelRunnerBase[TModelInputForHPU]):
     def profile_run(self) -> None:
         num_layers = self.model_config.get_num_layers(self.parallel_config)
         kv_caches = [None] * num_layers
-        bind_kv_cache(
-            self.vllm_config.compilation_config.static_forward_context,
-            [kv_caches])
         max_seq_len = self.bucketing_global_state.prompt_seq_bucket_cfg[-1]
         max_batch_size = min(self.max_num_batched_tokens // max_seq_len,
                              self.scheduler_config.max_num_seqs)
