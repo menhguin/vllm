@@ -368,7 +368,7 @@ class SamplingTensors:
     temperatures: torch.Tensor
     top_ps: torch.Tensor
     top_ks: torch.Tensor
-    min_ps: torch.Tensor
+    min_zs: torch.Tensor
     presence_penalties: torch.Tensor
     frequency_penalties: torch.Tensor
     repetition_penalties: torch.Tensor
@@ -388,13 +388,13 @@ class SamplingTensors:
         top_ks: List[int] = []
         temperatures: List[float] = []
         top_ps: List[float] = []
-        min_ps: List[float] = []
+        min_zs: List[float] = []
         presence_penalties: List[float] = []
         frequency_penalties: List[float] = []
         repetition_penalties: List[float] = []
         do_penalties = False
         do_top_p_top_k = False
-        do_min_p = False
+        do_min_z = False
 
         assert sampling_metadata.seq_groups is not None
         for seq_group in sampling_metadata.seq_groups:
@@ -405,7 +405,7 @@ class SamplingTensors:
             f = sampling_params.frequency_penalty
             r = sampling_params.repetition_penalty
             top_p = sampling_params.top_p
-            min_p = sampling_params.min_p
+            min_z = sampling_params.min_z
 
             # k should not be greater than the vocab size.
             top_k = min(sampling_params.top_k, vocab_size)
@@ -418,8 +418,8 @@ class SamplingTensors:
             if not do_top_p_top_k and (top_p < 1.0 - _SAMPLING_EPS
                                        or top_k != vocab_size):
                 do_top_p_top_k = True
-            if not do_min_p and min_p > _SAMPLING_EPS:
-                do_min_p = True
+            if not do_min_z and min_z > _SAMPLING_EPS:
+                do_min_z = True
             if not do_penalties and (abs(p) >= _SAMPLING_EPS
                                      or abs(f) >= _SAMPLING_EPS
                                      or abs(r - 1.0) >= _SAMPLING_EPS):
@@ -435,7 +435,7 @@ class SamplingTensors:
                 temperatures += [temperature] * prefill_len
                 top_ps += [top_p] * prefill_len
                 top_ks += [top_k] * prefill_len
-                min_ps += [min_p] * prefill_len
+                min_zs += [min_z] * prefill_len
                 presence_penalties += [0] * prefill_len
                 frequency_penalties += [0] * prefill_len
                 repetition_penalties += [1] * prefill_len
@@ -446,7 +446,7 @@ class SamplingTensors:
                 temperatures += [temperature] * sample_lens
                 top_ps += [top_p] * sample_lens
                 top_ks += [top_k] * sample_lens
-                min_ps += [min_p] * sample_lens
+                min_zs += [min_z] * sample_lens
                 presence_penalties += [p] * sample_lens
                 frequency_penalties += [f] * sample_lens
                 repetition_penalties += [r] * sample_lens
@@ -474,7 +474,7 @@ class SamplingTensors:
             temperatures,
             top_ps,
             top_ks,
-            min_ps,
+            min_zs,
             presence_penalties,
             frequency_penalties,
             repetition_penalties,
@@ -484,7 +484,7 @@ class SamplingTensors:
             device,
             dtype,
         )
-        return (sampling_tensors, do_penalties, do_top_p_top_k, do_min_p)
+        return (sampling_tensors, do_penalties, do_top_p_top_k, do_min_z)
 
     @classmethod
     def from_lists(
@@ -492,7 +492,7 @@ class SamplingTensors:
         temperatures: List[float],
         top_ps: List[float],
         top_ks: List[int],
-        min_ps: List[float],
+        min_zs: List[float],
         presence_penalties: List[float],
         frequency_penalties: List[float],
         repetition_penalties: List[float],
@@ -540,8 +540,8 @@ class SamplingTensors:
             dtype=dtype,
             pin_memory=pin_memory,
         )
-        min_ps_t = torch.tensor(
-            min_ps,
+        min_zs_t = torch.tensor(
+            min_zs,
             device="cpu",
             dtype=dtype,
             pin_memory=pin_memory,
@@ -577,7 +577,7 @@ class SamplingTensors:
             temperatures=temperatures_t.to(device=device, non_blocking=True),
             top_ps=top_ps_t.to(device=device, non_blocking=True),
             top_ks=top_ks_t.to(device=device, non_blocking=True),
-            min_ps=min_ps_t.to(device=device, non_blocking=True),
+            min_zs=min_zs_t.to(device=device, non_blocking=True),
             presence_penalties=presence_penalties_t.to(device=device,
                                                        non_blocking=True),
             frequency_penalties=frequency_penalties_t.to(device=device,
