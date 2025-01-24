@@ -205,13 +205,13 @@ class Sampler(nn.Module):
 
         # Initialize new sampling tensors
         (sampling_tensors, do_penalties, do_top_p_top_k,
-         do_min_p) = SamplingTensors.from_sampling_metadata(
+         do_min_z) = SamplingTensors.from_sampling_metadata(
              sampling_metadata, vocab_size, logits.device, logits.dtype)
 
         self._sampling_tensors = sampling_tensors
         self._do_penalties = do_penalties
         self._do_top_p_top_k = do_top_p_top_k
-        self._do_min_p = do_min_p
+        self._do_min_z = do_min_z
 
     def forward(
         self,
@@ -253,7 +253,7 @@ class Sampler(nn.Module):
         sampling_tensors = self._sampling_tensors
         do_penalties = self._do_penalties
         do_top_p_top_k = self._do_top_p_top_k
-        do_min_p = self._do_min_p
+        do_min_z = self._do_min_z
 
         logits = _apply_min_tokens_penalty(logits, sampling_metadata)
 
@@ -274,8 +274,8 @@ class Sampler(nn.Module):
             logits = _apply_top_k_top_p(logits, sampling_tensors.top_ps,
                                         sampling_tensors.top_ks)
 
-        if do_min_p:
-            logits = _apply_min_p(logits, sampling_tensors.min_ps)
+        if do_min_z:
+            logits = _apply_min_z(logits, sampling_tensors.min_zs)
 
         # We use float32 for probabilities and log probabilities.
         # Compute the probabilities.
@@ -413,9 +413,9 @@ def _apply_top_k_top_p(
     return logits
 
 
-def _apply_min_p(
+def _apply_min_z(
     logits: torch.Tensor,
-    min_p: torch.Tensor,
+    min_z: torch.Tensor,
 ) -> torch.Tensor:
     """
     Adapted from
@@ -423,8 +423,8 @@ def _apply_min_p(
     """
     probs = torch.softmax(logits, dim=-1)
     top_probs, _ = probs.max(dim=-1, keepdim=True)
-    scaled_min_p = min_p.unsqueeze_(dim=1) * top_probs
-    tokens_to_remove = probs < scaled_min_p
+    scaled_min_z = min_z.unsqueeze_(dim=1) * top_probs
+    tokens_to_remove = probs < scaled_min_z
     logits = logits.masked_fill_(tokens_to_remove, -float("inf"))
 
     return logits

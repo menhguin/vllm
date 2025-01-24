@@ -8,7 +8,6 @@ from torch import nn
 from vllm.attention import get_attn_backend
 from vllm.attention.backends.openvino import OpenVINOAttentionMetadata
 from vllm.config import VllmConfig
-from vllm.forward_context import set_forward_context
 from vllm.logger import init_logger
 from vllm.model_executor import SamplingMetadata
 from vllm.model_executor.layers.sampler import SamplerOutput
@@ -83,6 +82,9 @@ class OpenVINOModelRunner(ModelRunnerBase):
                                device_config=self.device_config,
                                kv_cache_dtype=self.kv_cache_dtype,
                                ov_core=self.ov_core)
+
+    def get_model(self) -> nn.Module:
+        return self.model
 
     def _prepare_model_input(
         self,
@@ -279,6 +281,7 @@ class OpenVINOModelRunner(ModelRunnerBase):
             block_indices_begins=block_indices_begins_tensor,
             max_context_len=max_context_len_tensor,
             multi_modal_placeholder_index_maps=placeholder_index_maps,
+            enable_kv_scales_calculation=False,
         )
 
         multi_modal_kwargs = MultiModalKwargs.batch(multi_modal_kwargs_list)
@@ -351,8 +354,7 @@ class OpenVINOModelRunner(ModelRunnerBase):
                                          device=self.device),
         }
 
-        with set_forward_context(attn_metadata, self.vllm_config, 0):
-            hidden_states = model_executable(**execute_model_kwargs)
+        hidden_states = model_executable(**execute_model_kwargs)
 
         # Compute the logits.
         logits = self.model.compute_logits(hidden_states, sampling_metadata)

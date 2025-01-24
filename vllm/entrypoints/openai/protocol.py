@@ -3,7 +3,7 @@
 import re
 import time
 from argparse import Namespace
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, ClassVar, Dict, List, Literal, Optional, Set, Union
 
 import torch
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -42,23 +42,31 @@ class OpenAIBaseModel(BaseModel):
     # OpenAI API does allow extra fields
     model_config = ConfigDict(extra="allow")
 
+    # Cache class field names
+    field_names: ClassVar[Optional[Set[str]]] = None
+
     @model_validator(mode="before")
     @classmethod
     def __log_extra_fields__(cls, data):
-        if isinstance(data, dict):
+
+        field_names = cls.field_names
+        if field_names is None:
+            if not isinstance(data, dict):
+                return data
             # Get all class field names and their potential aliases
             field_names = set()
             for field_name, field in cls.model_fields.items():
                 field_names.add(field_name)
-                if hasattr(field, 'alias') and field.alias:
-                    field_names.add(field.alias)
+                if alias := getattr(field, 'alias', None):
+                    field_names.add(alias)
+            cls.field_names = field_names
 
-            # Compare against both field names and aliases
-            extra_fields = data.keys() - field_names
-            if extra_fields:
-                logger.warning(
-                    "The following fields were present in the request "
-                    "but ignored: %s", extra_fields)
+        # Compare against both field names and aliases
+        if any(k not in field_names for k in data):
+            logger.warning(
+                "The following fields were present in the request "
+                "but ignored: %s",
+                data.keys() - field_names)
         return data
 
 
@@ -233,7 +241,7 @@ class ChatCompletionRequest(OpenAIBaseModel):
     best_of: Optional[int] = None
     use_beam_search: bool = False
     top_k: Optional[int] = None
-    min_p: Optional[float] = None
+    min_z: Optional[float] = None
     repetition_penalty: Optional[float] = None
     length_penalty: float = 1.0
     stop_token_ids: Optional[List[int]] = Field(default_factory=list)
@@ -362,7 +370,7 @@ class ChatCompletionRequest(OpenAIBaseModel):
         "temperature": 1.0,
         "top_p": 1.0,
         "top_k": -1,
-        "min_p": 0.0,
+        "min_z": 0.0,
     }
 
     def to_beam_search_params(
@@ -418,9 +426,9 @@ class ChatCompletionRequest(OpenAIBaseModel):
         if (top_k := self.top_k) is None:
             top_k = default_sampling_params.get(
                 "top_k", self._DEFAULT_SAMPLING_PARAMS["top_k"])
-        if (min_p := self.min_p) is None:
-            min_p = default_sampling_params.get(
-                "min_p", self._DEFAULT_SAMPLING_PARAMS["min_p"])
+        if (min_z := self.min_z) is None:
+            min_z = default_sampling_params.get(
+                "min_z", self._DEFAULT_SAMPLING_PARAMS["min_z"])
 
         prompt_logprobs = self.prompt_logprobs
         if prompt_logprobs is None and self.echo:
@@ -455,7 +463,7 @@ class ChatCompletionRequest(OpenAIBaseModel):
             temperature=temperature,
             top_p=top_p,
             top_k=top_k,
-            min_p=min_p,
+            min_z=min_z,
             seed=self.seed,
             stop=self.stop,
             stop_token_ids=self.stop_token_ids,
@@ -639,7 +647,7 @@ class CompletionRequest(OpenAIBaseModel):
     # doc: begin-completion-sampling-params
     use_beam_search: bool = False
     top_k: Optional[int] = None
-    min_p: Optional[float] = None
+    min_z: Optional[float] = None
     repetition_penalty: Optional[float] = None
     length_penalty: float = 1.0
     stop_token_ids: Optional[List[int]] = Field(default_factory=list)
@@ -723,7 +731,7 @@ class CompletionRequest(OpenAIBaseModel):
         "temperature": 1.0,
         "top_p": 1.0,
         "top_k": -1,
-        "min_p": 0.0,
+        "min_z": 0.0,
     }
 
     def to_beam_search_params(
@@ -776,9 +784,9 @@ class CompletionRequest(OpenAIBaseModel):
         if (top_k := self.top_k) is None:
             top_k = default_sampling_params.get(
                 "top_k", self._DEFAULT_SAMPLING_PARAMS["top_k"])
-        if (min_p := self.min_p) is None:
-            min_p = default_sampling_params.get(
-                "min_p", self._DEFAULT_SAMPLING_PARAMS["min_p"])
+        if (min_z := self.min_z) is None:
+            min_z = default_sampling_params.get(
+                "min_z", self._DEFAULT_SAMPLING_PARAMS["min_z"])
 
         prompt_logprobs = self.prompt_logprobs
         if prompt_logprobs is None and self.echo:
@@ -809,7 +817,7 @@ class CompletionRequest(OpenAIBaseModel):
             temperature=temperature,
             top_p=top_p,
             top_k=top_k,
-            min_p=min_p,
+            min_z=min_z,
             seed=self.seed,
             stop=self.stop,
             stop_token_ids=self.stop_token_ids,
