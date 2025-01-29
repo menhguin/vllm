@@ -186,7 +186,6 @@ class Sampler(nn.Module):
         # speculative decoding.
         self.include_gpu_probs_tensor = False
         self.should_modify_greedy_probs_inplace = False
-        self._do_min_z = False
 
     def _init_sampling_tensors(
         self,
@@ -442,19 +441,20 @@ def _apply_min_z(
 ) -> torch.Tensor:
     # Get probs
     probs = torch.softmax(logits, dim=-1)
+
     # Calculate statistics
     max_probs, _ = probs.max(dim=-1, keepdim=True)
     median_probs = torch.median(probs, dim=-1, keepdim=True).values
     std_probs = torch.clamp(probs.std(dim=-1, keepdim=True), min=1e-9)
-    
+
     # Compute z-scores
     z_scores = (probs - median_probs) / std_probs
     max_z = (max_probs - median_probs) / std_probs
-    
+
     # Apply threshold
     scaled_min_z = min_z.unsqueeze_(dim=1) * max_z
     tokens_to_remove = z_scores < scaled_min_z
-    
+
     logits = logits.masked_fill(tokens_to_remove, float("-inf"))
     return logits
 

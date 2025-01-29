@@ -209,7 +209,7 @@ def _prepare_seq_groups(
 
     Args:
         seq_group_metadata_list: A list of sequence group to batch.
-        seq_lens: A list of sequence lens per sequence group.
+        seq_lens: A list of sequence lenses per sequence group.
             Index of prompt len should match with seq_group_metadata_list.
         query_lens: A list of query lengths. Prompt lens include the length
             of entire prompt tokens, and it could be shorter.
@@ -498,7 +498,8 @@ class SamplingTensors:
             device,
             dtype,
         )
-        return (sampling_tensors, do_penalties, do_top_p_top_k, do_min_p, do_min_z)
+        return (sampling_tensors, do_penalties, do_top_p_top_k, do_min_p,
+                do_min_z)
 
     @classmethod
     def from_lists(
@@ -601,12 +602,11 @@ class SamplingTensors:
             min_ps=min_ps_t.to(device=device, non_blocking=True),
             min_zs=min_zs_t.to(device=device, non_blocking=True),
             presence_penalties=presence_penalties_t.to(device=device,
-                                                       non_blocking=True),
+                                                     non_blocking=True),
             frequency_penalties=frequency_penalties_t.to(device=device,
-                                                         non_blocking=True),
+                                                       non_blocking=True),
             repetition_penalties=repetition_penalties_t.to(device=device,
-                                                           non_blocking=True),
+                                                         non_blocking=True),
             prompt_tokens=prompt_t.to(device=device, non_blocking=True),
             output_tokens=output_t.to(device=device, non_blocking=True),
-            min_zs=min_zs_t.to(device=device, non_blocking=True),
         )
