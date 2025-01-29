@@ -1,24 +1,18 @@
-from typing import Callable, List, Protocol, Tuple, Union, runtime_checkable
-from abc import ABC, abstractmethod
+from typing import Callable, List, Tuple, Union
 
 import torch
 
 from vllm.transformers_utils.tokenizer import AnyTokenizer, MistralTokenizer
 
-@runtime_checkable
-class LogitsProcessor(Protocol):
-    """Protocol for all logit processors that can be applied during generation."""
-    def __call__(self, past_tokens: List[int], logits: torch.Tensor) -> torch.Tensor:
-        """Process input logits to generate modified logits for sampling."""
-        ...
+LogitsProcessor = Union[Callable[[List[int], torch.Tensor], torch.Tensor],
+                        Callable[[List[int], List[int], torch.Tensor],
+                                 torch.Tensor]]
+"""LogitsProcessor is a function that takes a list
+of previously generated tokens, the logits tensor
+for the next token and, optionally, prompt tokens as a
+first argument, and returns a modified tensor of logits
+to sample from."""
 
-class LogitsProcessorBase(ABC):
-    """Abstract base class for all logit processors that can be applied during generation."""
-    
-    @abstractmethod
-    def __call__(self, logits: torch.Tensor) -> torch.Tensor:
-        """Process input logits to generate modified logits for sampling."""
-        pass
 
 def get_bad_words_logits_processors(
         bad_words: List[str],
@@ -123,58 +117,3 @@ class NoBadWordsLogitsProcessor:
                 f" were specified as bad: {invalid_token_ids}."
                 f" All token id values should be integers satisfying:"
                 f" 0 <= token_id < {vocab_size}.")
-
-
-class MinZLogitsProcessor:
-    """Processor that implements min-z sampling."""
-    
-    def __init__(self, min_z: float, min_tokens: int = 1):
-        self.min_z = min_z
-        self.min_tokens = min_tokens
-
-    def __call__(self, past_tokens: List[int], logits: torch.Tensor) -> torch.Tensor:
-        """Apply min-z sampling to the logits.
-        
-        Args:
-            past_tokens: List of previously generated tokens (unused in min-z)
-            logits: Logits to be processed
-            
-        Returns:
-            Modified logits after applying min-z sampling
-        """
-        return _apply_min_z(logits, self.min_z, self.min_tokens)
-
-def _apply_min_z(
-    logits: torch.Tensor,
-    min_z: float,
-    min_tokens: int = 1
-) -> torch.Tensor:
-    if min_z <= 0.0:
-        return logits
-
-    # Get probs
-    probs = torch.softmax(logits, dim=-1)
-    
-    # Calculate statistics
-    max_probs, _ = probs.max(dim=-1, keepdim=True)
-    median_probs = torch.median(probs, dim=-1, keepdim=True).values
-    std_probs = torch.clamp(probs.std(dim=-1, keepdim=True), min=1e-9)
-    
-    # Compute z-scores
-    z_scores = (probs - median_probs) / std_probs
-    max_z = (max_probs - median_probs) / std_probs
-    
-    # Apply threshold
-    scaled_min_z = min_z * max_z
-    tokens_to_remove = z_scores < scaled_min_z
-
-    # Ensure at least min_tokens are kept
-    if min_tokens > 1:
-        row_sums = (~tokens_to_remove).sum(dim=-1)
-        need_adjust = row_sums < min_tokens
-        if need_adjust.any():
-            topk_values = torch.topk(logits[need_adjust], k=min_tokens, dim=-1)[1]
-            tokens_to_remove[need_adjust].scatter_(1, topk_values, False)
-    
-    logits = logits.masked_fill(tokens_to_remove, float("-inf"))
-    return logits
