@@ -921,6 +921,7 @@ class ModelConfig:
             "top_k",
             "top_p",
             "min_p",
+            "min_z",
             "max_new_tokens",
         ]
         if any(p in config for p in available_params):

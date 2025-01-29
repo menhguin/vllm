@@ -379,6 +379,7 @@ class SamplingTensors:
     repetition_penalties: torch.Tensor
     prompt_tokens: torch.Tensor
     output_tokens: torch.Tensor
+    min_zs: torch.Tensor
 
     @classmethod
     def from_sampling_metadata(
@@ -387,7 +388,7 @@ class SamplingTensors:
         vocab_size: int,
         device: torch.device,
         dtype: torch.dtype,
-    ) -> Tuple["SamplingTensors", bool, bool, bool]:
+    ) -> Tuple["SamplingTensors", bool, bool, bool, bool]:
         prompt_tokens: List[array] = []
         output_tokens: List[array] = []
         top_ks: List[int] = []
@@ -397,9 +398,11 @@ class SamplingTensors:
         presence_penalties: List[float] = []
         frequency_penalties: List[float] = []
         repetition_penalties: List[float] = []
+        min_zs: List[float] = []
         do_penalties = False
         do_top_p_top_k = False
         do_min_p = False
+        do_min_z = False
 
         assert sampling_metadata.seq_groups is not None
         for seq_group in sampling_metadata.seq_groups:
@@ -411,6 +414,7 @@ class SamplingTensors:
             r = sampling_params.repetition_penalty
             top_p = sampling_params.top_p
             min_p = sampling_params.min_p
+            min_z = sampling_params.min_z
 
             # k should not be greater than the vocab size.
             top_k = min(sampling_params.top_k, vocab_size)
@@ -429,6 +433,8 @@ class SamplingTensors:
                                      or abs(f) >= _SAMPLING_EPS
                                      or abs(r - 1.0) >= _SAMPLING_EPS):
                 do_penalties = True
+            if not do_min_z and min_z > _SAMPLING_EPS:
+                do_min_z = True
 
             is_prompt = seq_group.is_prompt
             if is_prompt and sampling_params.prompt_logprobs is not None:
@@ -444,6 +450,7 @@ class SamplingTensors:
                 presence_penalties += [0] * prefill_len
                 frequency_penalties += [0] * prefill_len
                 repetition_penalties += [1] * prefill_len
+                min_zs += [min_z] * prefill_len
 
             if seq_group.do_sample:
                 sample_lens = len(seq_group.sample_indices)
@@ -455,6 +462,7 @@ class SamplingTensors:
                 presence_penalties += [p] * sample_lens
                 frequency_penalties += [f] * sample_lens
                 repetition_penalties += [r] * sample_lens
+                min_zs += [min_z] * sample_lens
 
         if do_penalties:
             for seq_group in sampling_metadata.seq_groups:
@@ -488,8 +496,9 @@ class SamplingTensors:
             vocab_size,
             device,
             dtype,
+            min_zs,
         )
-        return (sampling_tensors, do_penalties, do_top_p_top_k, do_min_p)
+        return (sampling_tensors, do_penalties, do_top_p_top_k, do_min_p, do_min_z)
 
     @classmethod
     def from_lists(
@@ -506,6 +515,7 @@ class SamplingTensors:
         vocab_size: int,
         device: torch.device,
         dtype: torch.dtype,
+        min_zs: List[float],
     ) -> "SamplingTensors":
         # Note that the performance will be very bad without
         # pinned memory.
@@ -575,6 +585,12 @@ class SamplingTensors:
             dtype=torch.int,
             pin_memory=pin_memory,
         )
+        min_zs_t = torch.tensor(
+            min_zs,
+            device="cpu",
+            dtype=dtype,
+            pin_memory=pin_memory,
+        )
         # Because the memory is pinned, we can do non-blocking
         # transfer to device.
 
@@ -591,4 +607,5 @@ class SamplingTensors:
                                                            non_blocking=True),
             prompt_tokens=prompt_t.to(device=device, non_blocking=True),
             output_tokens=output_t.to(device=device, non_blocking=True),
+            min_zs=min_zs_t.to(device=device, non_blocking=True),
         )

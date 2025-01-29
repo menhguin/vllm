@@ -253,6 +253,7 @@ class ChatCompletionRequest(OpenAIBaseModel):
     spaces_between_special_tokens: bool = True
     truncate_prompt_tokens: Optional[Annotated[int, Field(ge=1)]] = None
     prompt_logprobs: Optional[int] = None
+    min_z: Optional[float] = None
     # doc: end-chat-completion-sampling-params
 
     # doc: begin-chat-completion-extra-params
@@ -372,6 +373,7 @@ class ChatCompletionRequest(OpenAIBaseModel):
         "top_p": 1.0,
         "top_k": -1,
         "min_p": 0.0,
+        "min_z": 0.0,
     }
 
     def to_beam_search_params(
@@ -439,6 +441,9 @@ class ChatCompletionRequest(OpenAIBaseModel):
         if (min_p := self.min_p) is None:
             min_p = default_sampling_params.get(
                 "min_p", self._DEFAULT_SAMPLING_PARAMS["min_p"])
+        if (min_z := self.min_z) is None:
+            min_z = default_sampling_params.get(
+                "min_z", self._DEFAULT_SAMPLING_PARAMS["min_z"])
 
         prompt_logprobs = self.prompt_logprobs
         if prompt_logprobs is None and self.echo:
@@ -474,6 +479,7 @@ class ChatCompletionRequest(OpenAIBaseModel):
             top_p=top_p,
             top_k=top_k,
             min_p=min_p,
+            min_z=min_z,
             seed=self.seed,
             stop=self.stop,
             stop_token_ids=self.stop_token_ids,

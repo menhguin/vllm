@@ -186,6 +186,7 @@ class Sampler(nn.Module):
         # speculative decoding.
         self.include_gpu_probs_tensor = False
         self.should_modify_greedy_probs_inplace = False
+        self._do_min_z = False
 
     def _init_sampling_tensors(
         self,
@@ -205,13 +206,14 @@ class Sampler(nn.Module):
 
         # Initialize new sampling tensors
         (sampling_tensors, do_penalties, do_top_p_top_k,
-         do_min_p) = SamplingTensors.from_sampling_metadata(
+         do_min_p, do_min_z) = SamplingTensors.from_sampling_metadata(
              sampling_metadata, vocab_size, logits.device, logits.dtype)
 
         self._sampling_tensors = sampling_tensors
         self._do_penalties = do_penalties
         self._do_top_p_top_k = do_top_p_top_k
         self._do_min_p = do_min_p
+        self._do_min_z = do_min_z
 
     def forward(
         self,
@@ -254,6 +256,7 @@ class Sampler(nn.Module):
         do_penalties = self._do_penalties
         do_top_p_top_k = self._do_top_p_top_k
         do_min_p = self._do_min_p
+        do_min_z = self._do_min_z
 
         logits = _apply_min_tokens_penalty(logits, sampling_metadata)
 
@@ -276,6 +279,9 @@ class Sampler(nn.Module):
 
         if do_min_p:
             logits = _apply_min_p(logits, sampling_tensors.min_ps)
+
+        if do_min_z:
+            logits = _apply_min_z(logits, sampling_tensors.min_zs)
 
         # We use float32 for probabilities and log probabilities.
         # Compute the probabilities.
@@ -427,6 +433,29 @@ def _apply_min_p(
     tokens_to_remove = probs < scaled_min_p
     logits = logits.masked_fill_(tokens_to_remove, -float("inf"))
 
+    return logits
+
+
+def _apply_min_z(
+    logits: torch.Tensor,
+    min_z: torch.Tensor,
+) -> torch.Tensor:
+    # Get probs
+    probs = torch.softmax(logits, dim=-1)
+    # Calculate statistics
+    max_probs, _ = probs.max(dim=-1, keepdim=True)
+    median_probs = torch.median(probs, dim=-1, keepdim=True).values
+    std_probs = torch.clamp(probs.std(dim=-1, keepdim=True), min=1e-9)
+    
+    # Compute z-scores
+    z_scores = (probs - median_probs) / std_probs
+    max_z = (max_probs - median_probs) / std_probs
+    
+    # Apply threshold
+    scaled_min_z = min_z.unsqueeze_(dim=1) * max_z
+    tokens_to_remove = z_scores < scaled_min_z
+    
+    logits = logits.masked_fill(tokens_to_remove, float("-inf"))
     return logits
 
 

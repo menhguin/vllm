@@ -117,3 +117,47 @@ class NoBadWordsLogitsProcessor:
                 f" were specified as bad: {invalid_token_ids}."
                 f" All token id values should be integers satisfying:"
                 f" 0 <= token_id < {vocab_size}.")
+
+
+class MinZLogitsProcessor(LogitsProcessor):
+    def __init__(self, min_z: float, min_tokens: int = 1):
+        self.min_z = min_z
+        self.min_tokens = min_tokens
+
+    def __call__(self, logits: torch.Tensor) -> torch.Tensor:
+        return _apply_min_z(logits, self.min_z, self.min_tokens)
+
+def _apply_min_z(
+    logits: torch.Tensor,
+    min_z: float,
+    min_tokens: int = 1
+) -> torch.Tensor:
+    if min_z <= 0.0:
+        return logits
+
+    # Calculate statistics
+    row_max, _ = logits.max(dim=-1, keepdim=True)
+    row_median = torch.median(logits, dim=-1, keepdim=True).values
+    row_std = torch.clamp(logits.std(dim=-1, keepdim=True), min=1e-9)
+
+    # Compute z-scores and threshold
+    n_max = (row_max - row_median) / row_std
+    n_threshold = n_max * min_z
+    z = (logits - row_median) / row_std
+    keep_mask = z >= n_threshold
+
+    # Ensure min_tokens are kept
+    if min_tokens > 1:
+        row_sums = keep_mask.sum(dim=-1)
+        need_adjust = row_sums < min_tokens
+        if need_adjust.any():
+            topk_values = torch.topk(logits[need_adjust], k=min_tokens, dim=-1)[1]
+            keep_mask[need_adjust].scatter_(1, topk_values, True)
+
+    # Apply mask
+    logits = torch.where(
+        keep_mask,
+        logits,
+        torch.tensor(float('-inf'), device=logits.device, dtype=logits.dtype)
+    )
+    return logits

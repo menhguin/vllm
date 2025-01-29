@@ -177,6 +177,7 @@ class SamplingParams(
     top_p: float = 1.0
     top_k: int = -1
     min_p: float = 0.0
+    min_z: float = 0.0
     seed: Optional[int] = None
     stop: Optional[Union[str, List[str]]] = None
     stop_token_ids: Optional[List[int]] = None
@@ -220,6 +221,7 @@ class SamplingParams(
         top_p: Optional[float] = 1.0,
         top_k: int = -1,
         min_p: float = 0.0,
+        min_z: float = 0.0,
         seed: Optional[int] = None,
         stop: Optional[Union[str, List[str]]] = None,
         stop_token_ids: Optional[List[int]] = None,
@@ -260,6 +262,7 @@ class SamplingParams(
             top_p=1.0 if top_p is None else top_p,
             top_k=top_k,
             min_p=min_p,
+            min_z=min_z,
             seed=seed,
             stop=stop,
             stop_token_ids=stop_token_ids,
@@ -405,6 +408,9 @@ class SamplingParams(
         if self.best_of != self._real_n and self.output_kind == (
                 RequestOutputKind.DELTA):
             raise ValueError("best_of must equal n to use output_kind=DELTA")
+        if not 0.0 <= self.min_z <= 1.0:
+            raise ValueError("min_z must be in [0, 1], got "
+                             f"{self.min_z}.")
 
     def _verify_greedy_sampling(self) -> None:
         if self.n > 1:
@@ -474,6 +480,7 @@ class SamplingParams(
             f"top_p={self.top_p}, "
             f"top_k={self.top_k}, "
             f"min_p={self.min_p}, "
+            f"min_z={self.min_z}, "
             f"seed={self.seed}, "
             f"stop={self.stop}, "
             f"stop_token_ids={self.stop_token_ids}, "
