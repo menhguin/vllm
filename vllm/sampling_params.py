@@ -123,6 +123,9 @@ class SamplingParams(
         min_p: Float that represents the minimum probability for a token to be
             considered, relative to the probability of the most likely token.
             Must be in [0, 1]. Set to 0 to disable this.
+        min_z: Float that represents the minimum z-score for a token to be
+            considered, relative to the z-score of the most likely token.
+            Must be in [0, 1]. Set to 0 to disable this.
         seed: Random seed to use for the generation.
         stop: List of strings that stop the generation when they are generated.
             The returned output will not contain the stop strings.
@@ -345,6 +348,7 @@ class SamplingParams(
             self.top_p = 1.0
             self.top_k = -1
             self.min_p = 0.0
+            self.min_z = 0.0
             self._verify_greedy_sampling()
         # eos_token_id is added to this by the engine
         self._all_stop_token_ids = set(self.stop_token_ids)
@@ -378,6 +382,9 @@ class SamplingParams(
         if not 0.0 <= self.min_p <= 1.0:
             raise ValueError("min_p must be in [0, 1], got "
                              f"{self.min_p}.")
+        if not 0.0 <= self.min_z <= 1.0:
+            raise ValueError("min_z must be in [0, 1], got "
+                             f"{self.min_z}.")
         if self.max_tokens is not None and self.max_tokens < 1:
             raise ValueError(
                 f"max_tokens must be at least 1, got {self.max_tokens}.")
@@ -408,9 +415,6 @@ class SamplingParams(
         if self.best_of != self._real_n and self.output_kind == (
                 RequestOutputKind.DELTA):
             raise ValueError("best_of must equal n to use output_kind=DELTA")
-        if not 0.0 <= self.min_z <= 1.0:
-            raise ValueError("min_z must be in [0, 1], got "
-                             f"{self.min_z}.")
 
     def _verify_greedy_sampling(self) -> None:
         if self.n > 1:
